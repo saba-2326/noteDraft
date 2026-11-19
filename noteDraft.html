@@ -1,0 +1,2142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>noteDraft - 台本・プロット執筆特化メモ帳</title>
+  <!-- Google Fonts: Inter & Noto Sans JP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', '"Noto Sans JP"', 'sans-serif']
+          },
+          colors: {
+            paper: {
+              bg: '#F8FAFC',
+              card: '#FFFFFF',
+              border: '#E2E8F0',
+              darkBg: '#0F172A',
+              darkCard: '#1E293B',
+              darkBorder: '#334155'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* カスタムスクロールバー非表示（横スクロールバー用） */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* テキストエリアの自然なリサイズと選択快適化 */
+    textarea.script-input {
+      resize: none;
+      overflow: hidden;
+      line-height: 1.75;
+    }
+    /* スワイプ操作中のスムーズなフィードバック */
+    .swipe-card {
+      touch-action: pan-y;
+      transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.15s ease, border-color 0.15s ease;
+    }
+    .swipe-card.swiping {
+      transition: none;
+    }
+    /* ドラッグ＆ドロップ並び替えの視覚ガイド */
+    .drag-over-top {
+      border-top: 3px solid #3B82F6 !important;
+    }
+    .drag-over-bottom {
+      border-bottom: 3px solid #3B82F6 !important;
+    }
+  </style>
+</head>
+<body class="bg-paper-bg text-slate-800 dark:bg-paper-darkBg dark:text-slate-100 font-sans antialiased selection:bg-blue-200 dark:selection:bg-blue-800 min-h-screen flex flex-col">
+
+  <!-- ==================== トップヘッダー ==================== -->
+  <header class="sticky top-0 z-30 bg-paper-card/95 dark:bg-paper-darkCard/95 backdrop-blur border-b border-paper-border dark:border-paper-darkBorder shadow-xs">
+    <div class="max-w-5xl mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
+      
+      <!-- ブランド＆作品タイトル入力 -->
+      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+          台
+        </div>
+        <input
+          id="scriptTitleInput"
+          type="text"
+          value="無題の台本"
+          placeholder="作品タイトルを入力..."
+          class="bg-transparent font-bold text-base sm:text-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 rounded-lg px-2 py-1 w-full max-w-xs sm:max-w-sm truncate"
+        />
+        <span
+          id="linkedFileBadge"
+          title="上書き保存対象のローカルファイル"
+          class="hidden shrink-0 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-medium truncate max-w-[140px]"
+        ></span>
+      </div>
+
+      <!-- モード切替タブ（執筆モード / 構造・一括編集） -->
+      <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700">
+        <button
+          id="tabWriteMode"
+          type="button"
+          class="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm flex items-center gap-1.5"
+        >
+          <span>✍️ 執筆</span>
+        </button>
+        <button
+          id="tabBulkMode"
+          type="button"
+          class="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5"
+        >
+          <span>🗂️ 構造・一括編集</span>
+        </button>
+      </div>
+
+      <!-- ファイル操作・ユーティリティボタン -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <!-- 汎用テキスト保存 (.txt) / 上書き保存 -->
+        <button
+          id="btnExportTxt"
+          type="button"
+          title="ローカルのテキストファイル(.txt)に保存（Ctrl + S）"
+          class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs sm:text-sm font-semibold shadow-xs transition flex items-center gap-1.5"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span id="btnExportTxtLabel">保存(.txt)</span>
+        </button>
+
+        <!-- 外部メモ帳テキスト読み込み (.txt) -->
+        <button
+          id="btnOpenLocalFile"
+          type="button"
+          title="PC内の.txtファイルを開く"
+          class="cursor-pointer px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-medium transition flex items-center gap-1"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          <span class="hidden sm:inline">開く</span>
+        </button>
+        <input id="fileImportInput" type="file" accept=".txt,text/plain" class="hidden" />
+
+        <!-- その他メニュー（サンプル読込・新規作成・ダークモード） -->
+        <div class="relative">
+          <button
+            id="btnMoreMenu"
+            type="button"
+            title="メニュー"
+            class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
+          </button>
+          <div
+            id="moreDropdown"
+            class="hidden absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 z-40 text-sm"
+          >
+            <button id="btnSaveAsTxt" type="button" class="w-full text-left px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2">
+              <span>💾 名前を付けて別名保存 (.txt)</span>
+            </button>
+            <button id="btnToggleDark" type="button" class="w-full text-left px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between">
+              <span>🌙 ダークモード切替</span>
+            </button>
+            <button id="btnLoadSample" type="button" class="w-full text-left px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2">
+              <span>📖 サンプル台本を入れる</span>
+            </button>
+            <div class="my-1 border-t border-slate-200 dark:border-slate-700"></div>
+            <button id="btnClearAll" type="button" class="w-full text-left px-4 py-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2">
+              <span>🗑️ すべて消去して新規作成</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 話者クイックバー（常時表示） ==================== -->
+    <div class="border-t border-paper-border/80 dark:border-paper-darkBorder/80 bg-slate-50/80 dark:bg-slate-900/60">
+      <div class="max-w-5xl mx-auto px-3 sm:px-6 py-2 flex items-center gap-2">
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 shrink-0">話者:</span>
+        
+        <!-- 登録済み話者チップ一覧（タップで選択中の段落に即割り当て） -->
+        <div id="speakerBarList" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 flex-1">
+          <!-- JSで動的生成 -->
+        </div>
+
+        <!-- 話者登録・編集モーダルを開くボタン -->
+        <button
+          id="btnOpenSpeakerModal"
+          type="button"
+          class="shrink-0 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-2xs transition flex items-center gap-1"
+        >
+          <span>＋ 話者登録・編集</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== 一括編集ツールバー（構造・一括編集モード時のみ表示） ==================== -->
+    <div id="bulkToolbar" class="hidden border-t border-blue-200 dark:border-blue-900/60 bg-blue-50/90 dark:bg-blue-950/40">
+      <div class="max-w-5xl mx-auto px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+        <div class="flex items-center gap-2">
+          <span id="selectedCountBadge" class="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold text-xs">
+            0件選択中
+          </span>
+          <button id="btnSelectAll" type="button" class="px-2 py-1 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-medium">
+            全選択
+          </button>
+          <button id="btnDeselectAll" type="button" class="px-2 py-1 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/60 text-slate-600 dark:text-slate-300">
+            解除
+          </button>
+          <!-- 話者別一括選択 -->
+          <select id="selectBySpeakerDropdown" class="rounded-lg border border-blue-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-slate-700 dark:text-slate-200 focus:outline-none">
+            <option value="">話者で絞り込み選択...</option>
+          </select>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          <!-- 話者の一括変更 -->
+          <div class="flex items-center gap-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-2 py-1">
+            <select id="bulkAssignSpeakerSelect" class="bg-transparent text-xs font-medium text-slate-800 dark:text-slate-100 focus:outline-none">
+              <!-- JSで生成 -->
+            </select>
+            <button id="btnBulkAssign" type="button" class="px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
+              一括変更
+            </button>
+          </div>
+
+          <!-- 上下移動 -->
+          <button id="btnBulkMoveUp" type="button" title="選択した段落を上へ移動" class="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+          </button>
+          <button id="btnBulkMoveDown" type="button" title="選択した段落を下へ移動" class="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+
+          <!-- 一括複製 -->
+          <button id="btnBulkDuplicate" type="button" class="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <span>複製</span>
+          </button>
+
+          <!-- 一括削除 -->
+          <button id="btnBulkDelete" type="button" class="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            <span>削除</span>
+          </button>
+
+          <!-- テキスト全体を一括編集（Rawテキスト編集モーダル） -->
+          <button id="btnOpenPlainTextModal" type="button" class="px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition">
+            📝 テキスト一括編集
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== メイン台本エディタ領域 ==================== -->
+  <main class="flex-1 max-w-4xl w-full mx-auto px-3 sm:px-6 pt-5 pb-28">
+    
+    <!-- 台本段落リストコンテナ -->
+    <div id="scriptContainer" class="space-y-2.5">
+      <!-- JSで段落カードを生成 -->
+    </div>
+
+    <!-- 末尾に新しい段落を追加するボタン -->
+    <div class="mt-6 flex justify-center">
+      <button
+        id="btnAppendBlock"
+        type="button"
+        class="px-5 py-2.5 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 text-sm font-medium transition flex items-center gap-2"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span>新しい段落を追加（または Shift + Enter）</span>
+      </button>
+    </div>
+
+  </main>
+
+  <!-- ==================== 固定フッター（操作ヒント＆リアルタイム統計） ==================== -->
+  <footer class="fixed bottom-0 inset-x-0 z-20 bg-paper-card/95 dark:bg-paper-darkCard/95 backdrop-blur border-t border-paper-border dark:border-paper-darkBorder">
+    <div class="max-w-5xl mx-auto px-3 sm:px-6 py-2 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-slate-500 dark:text-slate-400">
+      
+      <!-- 操作ヒント -->
+      <div id="hintBar" class="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full whitespace-nowrap">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+          📱 左右スワイプ
+        </span>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+          ⌨️ 空行で ←/→（入力中は Shift+←/→）で話者切替
+        </span>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+          Shift+Enter で段落追加
+        </span>
+      </div>
+
+      <!-- 文字数・推定尺カウンター -->
+      <div class="flex items-center gap-3 shrink-0 font-medium">
+        <span>合計 <strong id="statTotalChars" class="text-slate-800 dark:text-slate-200">0</strong> 文字</span>
+        <span>セリフ <strong id="statDialogueCount" class="text-slate-800 dark:text-slate-200">0</strong> 段落</span>
+        <span class="text-blue-600 dark:text-blue-400">目安尺 約<strong id="statDuration">0分00秒</strong></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== モーダル1：話者登録・編集モーダル ==================== -->
+  <div id="speakerModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <h2 class="font-bold text-base sm:text-lg text-slate-900 dark:text-white">🎭 話者（キャラクター）の登録・編集</h2>
+        <button id="btnCloseSpeakerModal" type="button" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        <!-- 新規話者追加フォーム -->
+        <form id="addSpeakerForm" class="flex items-center gap-2">
+          <input
+            id="newSpeakerColorInput"
+            type="color"
+            value="#2563EB"
+            title="テーマカラーを選択"
+            class="w-10 h-10 rounded-xl cursor-pointer border border-slate-300 dark:border-slate-600 bg-transparent p-0.5 shrink-0"
+          />
+          <input
+            id="newSpeakerNameInput"
+            type="text"
+            placeholder="新しい話者名（例：佐藤、ナレーション）"
+            class="flex-1 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+          <button
+            type="submit"
+            class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shrink-0 transition"
+          >
+            追加
+          </button>
+        </form>
+
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          ※ スワイプや左右キーでは、上から順番に話者が切り替わります。名前や色はいつでも変更できます。
+        </p>
+
+        <!-- 登録済み話者リスト -->
+        <div id="speakerManagerList" class="space-y-2">
+          <!-- JSで動的生成 -->
+        </div>
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+        <button id="btnDoneSpeakerModal" type="button" class="px-5 py-2 rounded-xl bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 text-sm font-semibold">
+          完了
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== モーダル2：テキスト一括編集モーダル（構造全体の直接編集） ==================== -->
+  <div id="plainTextModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <div>
+          <h2 class="font-bold text-base sm:text-lg text-slate-900 dark:text-white">📝 台本テキスト一括編集</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            一般的なメモ帳形式で全体を一括置換・コピペ編集できます（形式：<code class="bg-slate-100 dark:bg-slate-700 px-1 rounded">話者名「セリフ」</code> / <code class="bg-slate-100 dark:bg-slate-700 px-1 rounded">（ト書き）</code> / <code class="bg-slate-100 dark:bg-slate-700 px-1 rounded">■シーン</code>）
+          </p>
+        </div>
+        <button id="btnClosePlainTextModal" type="button" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-4 flex-1 overflow-y-auto">
+        <textarea
+          id="plainTextEditorArea"
+          rows="14"
+          class="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 p-3.5 text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="太郎「こんにちは！」&#10;花子「いい天気だね」&#10;（二人は空を見上げる）"
+        ></textarea>
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
+        <button id="btnCopyPlainText" type="button" class="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs sm:text-sm font-medium transition">
+          📋 クリップボードにコピー
+        </button>
+        <div class="flex items-center gap-2">
+          <button id="btnCancelPlainTextModal" type="button" class="px-4 py-2 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700">
+            キャンセル
+          </button>
+          <button id="btnApplyPlainText" type="button" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition">
+            変更を台本に反映
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== モーダル3：確認ダイアログ（alert/confirm代替） ==================== -->
+  <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
+      <h3 id="confirmModalTitle" class="font-bold text-base text-slate-900 dark:text-white">確認</h3>
+      <p id="confirmModalMessage" class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed"></p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button id="btnConfirmCancel" type="button" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+          キャンセル
+        </button>
+        <button id="btnConfirmOk" type="button" class="px-4 py-2 rounded-xl text-sm font-semibold bg-rose-600 hover:bg-rose-700 text-white">
+          実行する
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== トースト通知コンテナ ==================== -->
+  <div id="toastContainer" class="fixed bottom-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2"></div>
+
+  <!-- ==================== 外部.txtファイルドロップ用オーバーレイ ==================== -->
+  <div id="fileDropOverlay" class="hidden fixed inset-0 z-50 bg-blue-600/20 dark:bg-blue-500/20 backdrop-blur-xs border-4 border-dashed border-blue-500 flex items-center justify-center pointer-events-none">
+    <div class="bg-white dark:bg-slate-800 px-6 py-4 rounded-2xl shadow-2xl border border-blue-200 dark:border-blue-800 text-center">
+      <p class="text-base font-bold text-blue-600 dark:text-blue-400">📄 テキストファイル (.txt) をドロップして読み込み</p>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">話者名とセリフ・ト書きを自動解析して復元します</p>
+    </div>
+  </div>
+
+  <!-- ==================== アプリケーションロジック ==================== -->
+  <script>
+    (() => {
+      'use strict';
+
+      // --------------------------------------------------
+      // 1. 定数・カラーパレット・初期データ
+      // --------------------------------------------------
+      const STORAGE_KEY = 'noteDraft_script_data_v1';
+      const SPEAKER_PALETTE = [
+        '#2563EB', // Blue
+        '#E11D48', // Rose
+        '#059669', // Emerald
+        '#D97706', // Amber
+        '#7C3AED', // Violet
+        '#0891B2', // Cyan
+        '#EA580C', // Orange
+        '#4F46E5'  // Indigo
+      ];
+
+      function generateId(prefix = 'id') {
+        return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+      }
+
+      /**
+       * デフォルトの話者リスト
+       * type: 'scene' (シーン見出し) | 'direction' (ト書き) | 'dialogue' (セリフ)
+       */
+      function getDefaultSpeakers() {
+        return [
+          { id: 'spk_dir',   name: 'ト書き', color: '#64748B', type: 'direction', locked: true },
+          { id: 'spk_scene', name: 'シーン', color: '#475569', type: 'scene', locked: true },
+          { id: 'spk_1',     name: 'A',   color: '#2563EB', type: 'dialogue', locked: false },
+          { id: 'spk_2',     name: 'B',   color: '#E11D48', type: 'dialogue', locked: false }
+        ];
+      }
+
+      // アプリ初回立ち上げ時のみに表示するシンプルな初期台本
+      function getInitialBlocks() {
+        return [
+          { id: generateId('blk'), speakerId: 'spk_scene', text: 'ここにテキストを入力' }
+      ]
+      }
+
+      // 「サンプル台本を入れる」実行時に表示する使い方説明付きサンプル台本
+      function getSampleBlocks() {
+        return [
+          { id: generateId('blk'), speakerId: 'spk_scene', text: '放課後の教室・夕方' },
+          { id: generateId('blk'), speakerId: 'spk_dir',   text: '西日が差し込む教室。黒板の前で台本を読み合わせている二人。' },
+          { id: generateId('blk'), speakerId: 'spk_1',     text: 'ねえ、この行のセリフ、どっちが喋るんだっけ？' },
+          { id: generateId('blk'), speakerId: 'spk_2',     text: 'あ、そこは私！スマホなら行を左右にスワイプするだけで切り替えられるよ。' },
+          { id: generateId('blk'), speakerId: 'spk_1',     text: '本当だ。PCなら段落を選択した状態や空行で左右矢印キー、文字入力中は Shift＋左右キー で変わるんだね。\n普通の Enter で段落内改行、Shift＋Enter で次の段落を追加できるのも便利！' },
+          { id: generateId('blk'), speakerId: 'spk_dir',   text: '花子は満足そうに頷きながらメモ帳を開く。' },
+          { id: generateId('blk'), speakerId: 'spk_2',     text: 'しかも「保存(.txt)」を押せば、普通のメモ帳アプリでもそのまま読めるテキストで保存できるから安心！' },
+          { id: generateId('blk'), speakerId: 'spk_1',     text: '話している人は「話者変更・追加」から設定できて、一括機能では段落をまとめて操作することも、順番を変えることもできるんだね！' },
+          { id: generateId('blk'), speakerId: 'spk_2',     text: '使って見れば分かる！毎段落生まれる手間が極限まで削れた快適性を試してみて！！' },
+          { id: generateId('blk'), speakerId: 'spk_dir',   text: '笑い声は校庭にまで響いた。noteDraftの快適性は2人の活動だけでなく、人間としての根本的な部分すらも変えてしまったのだ...' }
+        ];
+      }
+
+      // --------------------------------------------------
+      // 2. アプリケーション状態 (State)
+      // --------------------------------------------------
+      let state = {
+        title: '無題の台本',
+        mode: 'write', // 'write' | 'bulk'
+        darkMode: false,
+        activeBlockId: null,
+        selectedIds: new Set(),
+        fileHandle: null,      // PCローカルファイルの直接上書き保存用ハンドル
+        linkedFileName: '',    // リンク中のローカルファイル名
+        speakers: getDefaultSpeakers(),
+        blocks: []
+      };
+
+      // DOM要素のキャッシュ
+      const dom = {
+        scriptTitleInput: document.getElementById('scriptTitleInput'),
+        linkedFileBadge: document.getElementById('linkedFileBadge'),
+        tabWriteMode: document.getElementById('tabWriteMode'),
+        tabBulkMode: document.getElementById('tabBulkMode'),
+        btnExportTxt: document.getElementById('btnExportTxt'),
+        btnExportTxtLabel: document.getElementById('btnExportTxtLabel'),
+        btnOpenLocalFile: document.getElementById('btnOpenLocalFile'),
+        fileImportInput: document.getElementById('fileImportInput'),
+        btnMoreMenu: document.getElementById('btnMoreMenu'),
+        moreDropdown: document.getElementById('moreDropdown'),
+        btnSaveAsTxt: document.getElementById('btnSaveAsTxt'),
+        btnLoadSample: document.getElementById('btnLoadSample'),
+        btnClearAll: document.getElementById('btnClearAll'),
+        btnToggleDark: document.getElementById('btnToggleDark'),
+        speakerBarList: document.getElementById('speakerBarList'),
+        btnOpenSpeakerModal: document.getElementById('btnOpenSpeakerModal'),
+        bulkToolbar: document.getElementById('bulkToolbar'),
+        selectedCountBadge: document.getElementById('selectedCountBadge'),
+        btnSelectAll: document.getElementById('btnSelectAll'),
+        btnDeselectAll: document.getElementById('btnDeselectAll'),
+        selectBySpeakerDropdown: document.getElementById('selectBySpeakerDropdown'),
+        bulkAssignSpeakerSelect: document.getElementById('bulkAssignSpeakerSelect'),
+        btnBulkAssign: document.getElementById('btnBulkAssign'),
+        btnBulkMoveUp: document.getElementById('btnBulkMoveUp'),
+        btnBulkMoveDown: document.getElementById('btnBulkMoveDown'),
+        btnBulkDuplicate: document.getElementById('btnBulkDuplicate'),
+        btnBulkDelete: document.getElementById('btnBulkDelete'),
+        btnOpenPlainTextModal: document.getElementById('btnOpenPlainTextModal'),
+        scriptContainer: document.getElementById('scriptContainer'),
+        btnAppendBlock: document.getElementById('btnAppendBlock'),
+        hintBar: document.getElementById('hintBar'),
+        statTotalChars: document.getElementById('statTotalChars'),
+        statDialogueCount: document.getElementById('statDialogueCount'),
+        statDuration: document.getElementById('statDuration'),
+        speakerModal: document.getElementById('speakerModal'),
+        btnCloseSpeakerModal: document.getElementById('btnCloseSpeakerModal'),
+        addSpeakerForm: document.getElementById('addSpeakerForm'),
+        newSpeakerColorInput: document.getElementById('newSpeakerColorInput'),
+        newSpeakerNameInput: document.getElementById('newSpeakerNameInput'),
+        speakerManagerList: document.getElementById('speakerManagerList'),
+        btnDoneSpeakerModal: document.getElementById('btnDoneSpeakerModal'),
+        plainTextModal: document.getElementById('plainTextModal'),
+        btnClosePlainTextModal: document.getElementById('btnClosePlainTextModal'),
+        plainTextEditorArea: document.getElementById('plainTextEditorArea'),
+        btnCopyPlainText: document.getElementById('btnCopyPlainText'),
+        btnCancelPlainTextModal: document.getElementById('btnCancelPlainTextModal'),
+        btnApplyPlainText: document.getElementById('btnApplyPlainText'),
+        confirmModal: document.getElementById('confirmModal'),
+        confirmModalTitle: document.getElementById('confirmModalTitle'),
+        confirmModalMessage: document.getElementById('confirmModalMessage'),
+        btnConfirmCancel: document.getElementById('btnConfirmCancel'),
+        btnConfirmOk: document.getElementById('btnConfirmOk'),
+        toastContainer: document.getElementById('toastContainer'),
+        fileDropOverlay: document.getElementById('fileDropOverlay')
+      };
+
+      // --------------------------------------------------
+      // 3. UI通知・確認ダイアログ・ローカルストレージ保存
+      // --------------------------------------------------
+      function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        const bgClass = type === 'error'
+          ? 'bg-rose-600 text-white'
+          : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900';
+        toast.className = `px-4 py-2 rounded-xl shadow-lg text-xs sm:text-sm font-semibold transition-all duration-200 transform translate-y-2 opacity-0 ${bgClass}`;
+        toast.textContent = message;
+        dom.toastContainer.appendChild(toast);
+
+        requestAnimationFrame(() => {
+          toast.classList.remove('translate-y-2', 'opacity-0');
+        });
+
+        setTimeout(() => {
+          toast.classList.add('translate-y-2', 'opacity-0');
+          setTimeout(() => toast.remove(), 220);
+        }, 2200);
+      }
+
+      function showConfirmDialog(title, message) {
+        return new Promise((resolve) => {
+          dom.confirmModalTitle.textContent = title;
+          dom.confirmModalMessage.textContent = message;
+          dom.confirmModal.classList.remove('hidden');
+
+          const cleanup = (result) => {
+            dom.confirmModal.classList.add('hidden');
+            dom.btnConfirmOk.removeEventListener('click', onOk);
+            dom.btnConfirmCancel.removeEventListener('click', onCancel);
+            resolve(result);
+          };
+          const onOk = () => cleanup(true);
+          const onCancel = () => cleanup(false);
+
+          dom.btnConfirmOk.addEventListener('click', onOk);
+          dom.btnConfirmCancel.addEventListener('click', onCancel);
+        });
+      }
+
+      let saveTimer = null;
+      function scheduleSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          try {
+            const payload = {
+              title: state.title,
+              darkMode: state.darkMode,
+              speakers: state.speakers,
+              blocks: state.blocks
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+          } catch (err) {
+            console.warn('ローカルストレージへの保存に失敗しました:', err);
+          }
+        }, 300);
+      }
+
+      function loadFromStorage() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) {
+            state.blocks = getInitialBlocks();
+            state.activeBlockId = state.blocks[1]?.id || state.blocks[0]?.id || null;
+            return;
+          }
+          const parsed = JSON.parse(raw);
+          if (parsed.title) state.title = parsed.title;
+          if (typeof parsed.darkMode === 'boolean') state.darkMode = parsed.darkMode;
+          if (Array.isArray(parsed.speakers) && parsed.speakers.length > 0) {
+            state.speakers = parsed.speakers;
+          }
+          if (Array.isArray(parsed.blocks) && parsed.blocks.length > 0) {
+            state.blocks = parsed.blocks;
+          } else {
+            state.blocks = [{ id: generateId('blk'), speakerId: state.speakers[2]?.id || state.speakers[0].id, text: '' }];
+          }
+          state.activeBlockId = state.blocks[0]?.id || null;
+        } catch (err) {
+          console.error('データ読み込みエラー:', err);
+          state.blocks = getInitialBlocks();
+        }
+      }
+
+      function applyDarkMode() {
+        if (state.darkMode) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+
+      // --------------------------------------------------
+      // 4. 話者管理ヘルパー
+      // --------------------------------------------------
+      function getSpeakerById(speakerId) {
+        return state.speakers.find(s => s.id === speakerId) || state.speakers[0];
+      }
+
+      /**
+       * 指定段落の話者を前後にローテーション切り替えする
+       * @param {string} blockId
+       * @param {number} direction +1 (次へ / 右スワイプ・右キー) or -1 (前へ / 左スワイプ・左キー)
+       */
+      function cycleBlockSpeaker(blockId, direction = 1) {
+        const block = state.blocks.find(b => b.id === blockId);
+        if (!block || state.speakers.length === 0) return;
+
+        const currentIndex = state.speakers.findIndex(s => s.id === block.speakerId);
+        const len = state.speakers.length;
+        const nextIndex = (currentIndex + direction + len) % len;
+        const nextSpeaker = state.speakers[nextIndex];
+
+        block.speakerId = nextSpeaker.id;
+        state.activeBlockId = blockId;
+
+        updateSingleBlockAppearance(blockId);
+        renderSpeakerQuickBar();
+        updateStats();
+        scheduleSave();
+      }
+
+      function setBlockSpeaker(blockId, speakerId) {
+        const block = state.blocks.find(b => b.id === blockId);
+        if (!block) return;
+        block.speakerId = speakerId;
+        state.activeBlockId = blockId;
+
+        updateSingleBlockAppearance(blockId);
+        renderSpeakerQuickBar();
+        updateStats();
+        scheduleSave();
+      }
+
+      // --------------------------------------------------
+      // 5. 話者クイックバー＆一括編集用セレクトの描画
+      // --------------------------------------------------
+      function renderSpeakerQuickBar() {
+        const activeBlock = state.blocks.find(b => b.id === state.activeBlockId);
+        const activeSpeakerId = activeBlock ? activeBlock.speakerId : null;
+
+        dom.speakerBarList.innerHTML = '';
+        state.speakers.forEach((spk) => {
+          const isCurrent = spk.id === activeSpeakerId;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1.5 border ${
+            isCurrent
+              ? 'ring-2 ring-offset-1 dark:ring-offset-slate-900 shadow-xs scale-[1.02]'
+              : 'opacity-85 hover:opacity-100 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+          }`;
+
+          if (isCurrent) {
+            btn.style.backgroundColor = spk.color;
+            btn.style.borderColor = spk.color;
+            btn.style.color = '#FFFFFF';
+          }
+
+          const dot = document.createElement('span');
+          dot.className = 'w-2 h-2 rounded-full shrink-0';
+          dot.style.backgroundColor = isCurrent ? '#FFFFFF' : spk.color;
+
+          const label = document.createElement('span');
+          label.textContent = spk.name;
+
+          btn.appendChild(dot);
+          btn.appendChild(label);
+
+          btn.addEventListener('click', () => {
+            if (state.activeBlockId) {
+              setBlockSpeaker(state.activeBlockId, spk.id);
+              focusBlockTextarea(state.activeBlockId);
+            } else if (state.blocks.length > 0) {
+              setBlockSpeaker(state.blocks[0].id, spk.id);
+              focusBlockTextarea(state.blocks[0].id);
+            }
+          });
+
+          dom.speakerBarList.appendChild(btn);
+        });
+
+        // 一括編集ツールのセレクトボックスも同期更新
+        dom.bulkAssignSpeakerSelect.innerHTML = '';
+        dom.selectBySpeakerDropdown.innerHTML = '<option value="">話者で絞り込み選択...</option>';
+        state.speakers.forEach((spk) => {
+          const opt1 = document.createElement('option');
+          opt1.value = spk.id;
+          opt1.textContent = spk.name;
+          dom.bulkAssignSpeakerSelect.appendChild(opt1);
+
+          const opt2 = document.createElement('option');
+          opt2.value = spk.id;
+          opt2.textContent = `「${spk.name}」の段落をすべて選択`;
+          dom.selectBySpeakerDropdown.appendChild(opt2);
+        });
+      }
+
+      // --------------------------------------------------
+      // 6. テキストエリア自動高さ調整＆フォーカス制御
+      // --------------------------------------------------
+      function autoResizeTextarea(textarea) {
+        if (!textarea) return;
+        textarea.style.height = 'auto';
+        textarea.style.height = `${Math.max(28, textarea.scrollHeight)}px`;
+      }
+
+      function focusBlockTextarea(blockId, cursorPosition = null) {
+        const el = dom.scriptContainer.querySelector(`[data-block-id="${blockId}"] textarea`);
+        if (!el) return;
+        el.focus();
+        if (cursorPosition !== null && typeof el.setSelectionRange === 'function') {
+          const pos = Math.max(0, Math.min(cursorPosition, el.value.length));
+          el.setSelectionRange(pos, pos);
+        }
+      }
+
+      // --------------------------------------------------
+      // 7. 台本ブロック（段落）の描画とインタラクション
+      // --------------------------------------------------
+      function getBlockStyleClasses(speaker, isActive) {
+        const activeRing = isActive
+          ? 'ring-2 ring-blue-500/40 dark:ring-blue-400/40 border-blue-300 dark:border-blue-700'
+          : 'border-paper-border dark:border-paper-darkBorder hover:border-slate-300 dark:hover:border-slate-600';
+
+        if (speaker.type === 'scene') {
+          return `bg-slate-100/90 dark:bg-slate-800/90 ${activeRing}`;
+        }
+        if (speaker.type === 'direction') {
+          return `bg-slate-50/90 dark:bg-slate-900/50 ${activeRing}`;
+        }
+        return `bg-paper-card dark:bg-paper-darkCard ${activeRing}`;
+      }
+
+      function renderSpeakerBadgeContent(badgeBtn, speaker) {
+        badgeBtn.innerHTML = '';
+        badgeBtn.style.borderColor = `${speaker.color}40`;
+        badgeBtn.style.backgroundColor = `${speaker.color}14`;
+        badgeBtn.style.color = speaker.color;
+
+        const dot = document.createElement('span');
+        dot.className = 'w-2 h-2 rounded-full shrink-0';
+        dot.style.backgroundColor = speaker.color;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'truncate font-bold text-xs sm:text-sm';
+        nameSpan.textContent = speaker.name;
+
+        badgeBtn.appendChild(dot);
+        badgeBtn.appendChild(nameSpan);
+      }
+
+      /**
+       * 1つの段落カードの見た目だけを高速更新（フォーカスを失わないため）
+       */
+      function updateSingleBlockAppearance(blockId) {
+        const block = state.blocks.find(b => b.id === blockId);
+        const card = dom.scriptContainer.querySelector(`[data-block-id="${blockId}"]`);
+        if (!block || !card) return;
+
+        const speaker = getSpeakerById(block.speakerId);
+        const isActive = state.activeBlockId === blockId;
+
+        card.className = `swipe-card relative rounded-2xl border shadow-2xs transition-colors ${getBlockStyleClasses(speaker, isActive)}`;
+
+        const badgeBtn = card.querySelector('.speaker-badge-btn');
+        if (badgeBtn) {
+          renderSpeakerBadgeContent(badgeBtn, speaker);
+        }
+
+        const textarea = card.querySelector('textarea');
+        if (textarea) {
+          if (speaker.type === 'scene') {
+            textarea.placeholder = 'シーン・場所・時間帯を入力（例：放課後の教室・夕方）';
+            textarea.className = 'script-input w-full bg-transparent focus:outline-none text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400/70';
+          } else if (speaker.type === 'direction') {
+            textarea.placeholder = 'ト書き・状況描写を入力...';
+            textarea.className = 'script-input w-full bg-transparent focus:outline-none text-sm sm:text-base italic text-slate-600 dark:text-slate-300 placeholder:text-slate-400/70';
+          } else {
+            textarea.placeholder = `${speaker.name}のセリフを入力...`;
+            textarea.className = 'script-input w-full bg-transparent focus:outline-none text-sm sm:text-base text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70';
+          }
+          autoResizeTextarea(textarea);
+        }
+      }
+
+      let draggedBlockId = null;
+
+      function createBlockElement(block, index) {
+        const speaker = getSpeakerById(block.speakerId);
+        const isActive = state.activeBlockId === block.id;
+        const isBulk = state.mode === 'bulk';
+
+        const card = document.createElement('div');
+        card.dataset.blockId = block.id;
+        card.tabIndex = -1;
+        card.className = `swipe-card relative rounded-2xl border shadow-2xs focus:outline-none ${getBlockStyleClasses(speaker, isActive)}`;
+
+        // テキスト入力欄やボタン以外の領域をクリックした時は、文字入力状態にせず段落のみを選択状態にする
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('textarea, button, input, select')) return;
+          if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+            document.activeElement.blur();
+          }
+          const prevActiveId = state.activeBlockId;
+          state.activeBlockId = block.id;
+          if (prevActiveId && prevActiveId !== block.id) {
+            updateSingleBlockAppearance(prevActiveId);
+          }
+          updateSingleBlockAppearance(block.id);
+          renderSpeakerQuickBar();
+          card.focus({ preventScroll: true });
+        });
+
+        // スワイプ時の方向ガイド表示（背景オーバーレイ）
+        const swipeHintLeft = document.createElement('div');
+        swipeHintLeft.className = 'swipe-hint-left hidden absolute inset-y-0 left-3 flex items-center text-xs font-bold text-blue-600 dark:text-blue-400 pointer-events-none';
+
+        const swipeHintRight = document.createElement('div');
+        swipeHintRight.className = 'swipe-hint-right hidden absolute inset-y-0 right-3 flex items-center text-xs font-bold text-rose-600 dark:text-rose-400 pointer-events-none';
+
+        const inner = document.createElement('div');
+        inner.className = 'relative flex items-start gap-2.5 sm:gap-3.5 p-3 sm:p-3.5';
+
+        // 一括編集モード時のチェックボックス＆ドラッグハンドル
+        if (isBulk) {
+          const bulkLeftControls = document.createElement('div');
+          bulkLeftControls.className = 'flex items-center gap-1.5 pt-1 shrink-0';
+
+          const dragHandle = document.createElement('span');
+          dragHandle.title = 'ドラッグして並び替え';
+          dragHandle.className = 'cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 select-none px-0.5';
+          dragHandle.textContent = '⋮⋮';
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = state.selectedIds.has(block.id);
+          checkbox.className = 'w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer';
+          checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+              state.selectedIds.add(block.id);
+            } else {
+              state.selectedIds.delete(block.id);
+            }
+            updateBulkSelectionUI();
+          });
+
+          bulkLeftControls.appendChild(dragHandle);
+          bulkLeftControls.appendChild(checkbox);
+          inner.appendChild(bulkLeftControls);
+        }
+
+        // 左カラム：話者バッジボタン（クリックで次の話者へ切り替え）
+        const leftCol = document.createElement('div');
+        leftCol.className = 'w-24 sm:w-32 shrink-0 flex flex-col items-start justify-start pt-0.5';
+
+        const badgeBtn = document.createElement('button');
+        badgeBtn.type = 'button';
+        badgeBtn.title = 'クリックで次の話者に切替（右クリックで前の話者）';
+        badgeBtn.className = 'speaker-badge-btn w-full px-2.5 py-1.5 rounded-xl border text-left flex items-center gap-1.5 transition active:scale-95 select-none';
+        renderSpeakerBadgeContent(badgeBtn, speaker);
+
+        badgeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          cycleBlockSpeaker(block.id, 1);
+          focusBlockTextarea(block.id);
+        });
+        badgeBtn.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          cycleBlockSpeaker(block.id, -1);
+          focusBlockTextarea(block.id);
+        });
+
+        leftCol.appendChild(badgeBtn);
+        inner.appendChild(leftCol);
+
+        // 右カラム：台本テキスト入力エリア
+        const rightCol = document.createElement('div');
+        rightCol.className = 'flex-1 min-w-0 flex items-start gap-2';
+
+        const textarea = document.createElement('textarea');
+        textarea.rows = 1;
+        textarea.value = block.text;
+        textarea.dataset.blockId = block.id;
+
+        if (speaker.type === 'scene') {
+          textarea.placeholder = 'シーン・場所・時間帯を入力（例：放課後の教室・夕方）';
+          textarea.className = 'script-input w-full bg-transparent focus:outline-none text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400/70';
+        } else if (speaker.type === 'direction') {
+          textarea.placeholder = 'ト書き・状況描写を入力...';
+          textarea.className = 'script-input w-full bg-transparent focus:outline-none text-sm sm:text-base italic text-slate-600 dark:text-slate-300 placeholder:text-slate-400/70';
+        } else {
+          textarea.placeholder = `${speaker.name}のセリフを入力...`;
+          textarea.className = 'script-input w-full bg-transparent focus:outline-none text-sm sm:text-base text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70';
+        }
+
+        // フォーカス時のアクティブ状態更新
+        textarea.addEventListener('focus', () => {
+          const prevActiveId = state.activeBlockId;
+          state.activeBlockId = block.id;
+          if (prevActiveId && prevActiveId !== block.id) {
+            updateSingleBlockAppearance(prevActiveId);
+          }
+          updateSingleBlockAppearance(block.id);
+          renderSpeakerQuickBar();
+        });
+
+        // テキスト入力時の保存とリサイズ
+        textarea.addEventListener('input', () => {
+          block.text = textarea.value;
+          autoResizeTextarea(textarea);
+          updateStats();
+          scheduleSave();
+        });
+
+        // キーボード操作（Enterで段落内改行、Shift+Enterで新段落追加、Shift+左右キーで話者切替）
+        textarea.addEventListener('keydown', (e) => handleTextareaKeydown(e, block, textarea));
+
+        rightCol.appendChild(textarea);
+
+        // 段落削除（×）ボタン（2段落以上ある場合のみ表示）
+        if (state.blocks.length > 1) {
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.title = 'この段落を削除';
+          delBtn.className = 'opacity-40 hover:opacity-100 text-slate-400 hover:text-rose-500 p-1 rounded-lg transition shrink-0';
+          delBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+          delBtn.addEventListener('click', () => deleteBlock(block.id));
+          rightCol.appendChild(delBtn);
+        }
+
+        inner.appendChild(rightCol);
+        card.appendChild(swipeHintLeft);
+        card.appendChild(swipeHintRight);
+        card.appendChild(inner);
+
+        // タッチスワイプ（スマホ・タブレット向け話者切替）のアタッチ
+        attachSwipeGesture(card, block);
+
+        // 一括編集モード時のドラッグ＆ドロップ並び替え
+        if (isBulk) {
+          card.draggable = true;
+          card.addEventListener('dragstart', (e) => {
+            draggedBlockId = block.id;
+            card.classList.add('opacity-50');
+            if (e.dataTransfer) {
+              e.dataTransfer.effectAllowed = 'move';
+            }
+          });
+          card.addEventListener('dragend', () => {
+            draggedBlockId = null;
+            card.classList.remove('opacity-50');
+            dom.scriptContainer.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+              el.classList.remove('drag-over-top', 'drag-over-bottom');
+            });
+          });
+          card.addEventListener('dragover', (e) => {
+            if (!draggedBlockId || draggedBlockId === block.id) return;
+            e.preventDefault();
+            const rect = card.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            card.classList.remove('drag-over-top', 'drag-over-bottom');
+            if (e.clientY < midY) {
+              card.classList.add('drag-over-top');
+            } else {
+              card.classList.add('drag-over-bottom');
+            }
+          });
+          card.addEventListener('dragleave', () => {
+            card.classList.remove('drag-over-top', 'drag-over-bottom');
+          });
+          card.addEventListener('drop', (e) => {
+            if (!draggedBlockId || draggedBlockId === block.id) return;
+            e.preventDefault();
+            const rect = card.getBoundingClientRect();
+            const insertAfter = e.clientY >= rect.top + rect.height / 2;
+            card.classList.remove('drag-over-top', 'drag-over-bottom');
+
+            const fromIdx = state.blocks.findIndex(b => b.id === draggedBlockId);
+            if (fromIdx === -1) return;
+            const [moved] = state.blocks.splice(fromIdx, 1);
+
+            let toIdx = state.blocks.findIndex(b => b.id === block.id);
+            if (insertAfter) toIdx += 1;
+            state.blocks.splice(toIdx, 0, moved);
+
+            renderScriptBlocks();
+            scheduleSave();
+          });
+        }
+
+        return card;
+      }
+
+      function renderScriptBlocks() {
+        dom.scriptContainer.innerHTML = '';
+        state.blocks.forEach((block, index) => {
+          const card = createBlockElement(block, index);
+          dom.scriptContainer.appendChild(card);
+          const ta = card.querySelector('textarea');
+          autoResizeTextarea(ta);
+        });
+        renderSpeakerQuickBar();
+        updateStats();
+        updateBulkSelectionUI();
+      }
+
+      // --------------------------------------------------
+      // 8. タッチスワイプによる話者切り替えジェスチャー
+      // --------------------------------------------------
+      function attachSwipeGesture(card, block) {
+        let startX = 0;
+        let startY = 0;
+        let deltaX = 0;
+        let isHorizontalSwipe = false;
+
+        const hintLeft = card.querySelector('.swipe-hint-left');
+        const hintRight = card.querySelector('.swipe-hint-right');
+        const SWIPE_THRESHOLD = 45;
+
+        card.addEventListener('touchstart', (e) => {
+          if (e.touches.length !== 1) return;
+          startX = e.touches[0].clientX;
+          startY = e.touches[0].clientY;
+          deltaX = 0;
+          isHorizontalSwipe = false;
+          card.classList.add('swiping');
+        }, { passive: true });
+
+        card.addEventListener('touchmove', (e) => {
+          if (e.touches.length !== 1) return;
+          const dx = e.touches[0].clientX - startX;
+          const dy = e.touches[0].clientY - startY;
+
+          if (!isHorizontalSwipe) {
+            if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+              isHorizontalSwipe = true;
+            } else if (Math.abs(dy) > 12) {
+              return;
+            }
+          }
+
+          if (isHorizontalSwipe) {
+            deltaX = dx;
+            const clampedX = Math.max(-90, Math.min(90, dx));
+            card.style.transform = `translateX(${clampedX}px)`;
+
+            const currentIdx = state.speakers.findIndex(s => s.id === block.speakerId);
+            const len = state.speakers.length;
+            if (dx > 20) {
+              const nextSpk = state.speakers[(currentIdx + 1) % len];
+              hintLeft.textContent = `→ ${nextSpk.name}`;
+              hintLeft.classList.remove('hidden');
+              hintRight.classList.add('hidden');
+            } else if (dx < -20) {
+              const prevSpk = state.speakers[(currentIdx - 1 + len) % len];
+              hintRight.textContent = `← ${prevSpk.name}`;
+              hintRight.classList.remove('hidden');
+              hintLeft.classList.add('hidden');
+            }
+          }
+        }, { passive: true });
+
+        const finishSwipe = () => {
+          card.classList.remove('swiping');
+          card.style.transform = '';
+          hintLeft.classList.add('hidden');
+          hintRight.classList.add('hidden');
+
+          if (isHorizontalSwipe && Math.abs(deltaX) >= SWIPE_THRESHOLD) {
+            const dir = deltaX > 0 ? 1 : -1;
+            cycleBlockSpeaker(block.id, dir);
+          }
+          deltaX = 0;
+          isHorizontalSwipe = false;
+        };
+
+        card.addEventListener('touchend', finishSwipe);
+        card.addEventListener('touchcancel', finishSwipe);
+      }
+
+      // --------------------------------------------------
+      // 9. PCキーボード操作＆段落追加・削除
+      // --------------------------------------------------
+      function getNextDefaultSpeakerId(currentSpeakerId) {
+        const dialogueSpeakers = state.speakers.filter(s => s.type === 'dialogue');
+        if (dialogueSpeakers.length === 0) return state.speakers[0].id;
+
+        const idx = dialogueSpeakers.findIndex(s => s.id === currentSpeakerId);
+        if (idx === -1) {
+          return dialogueSpeakers[0].id;
+        }
+        return dialogueSpeakers[(idx + 1) % dialogueSpeakers.length].id;
+      }
+
+      function insertBlockAfter(targetBlockId, initialText = '') {
+        const idx = state.blocks.findIndex(b => b.id === targetBlockId);
+        const currentBlock = idx !== -1 ? state.blocks[idx] : state.blocks[state.blocks.length - 1];
+        const nextSpeakerId = getNextDefaultSpeakerId(currentBlock?.speakerId);
+
+        const newBlock = {
+          id: generateId('blk'),
+          speakerId: nextSpeakerId,
+          text: initialText
+        };
+
+        const insertIndex = idx !== -1 ? idx + 1 : state.blocks.length;
+        state.blocks.splice(insertIndex, 0, newBlock);
+        state.activeBlockId = newBlock.id;
+
+        renderScriptBlocks();
+        scheduleSave();
+        focusBlockTextarea(newBlock.id, 0);
+      }
+
+      function deleteBlock(blockId) {
+        if (state.blocks.length <= 1) {
+          state.blocks[0].text = '';
+          renderScriptBlocks();
+          scheduleSave();
+          focusBlockTextarea(state.blocks[0].id, 0);
+          return;
+        }
+
+        const idx = state.blocks.findIndex(b => b.id === blockId);
+        if (idx === -1) return;
+
+        state.blocks.splice(idx, 1);
+        state.selectedIds.delete(blockId);
+
+        const focusTargetIdx = Math.max(0, idx - 1);
+        const targetBlock = state.blocks[focusTargetIdx];
+        state.activeBlockId = targetBlock.id;
+
+        renderScriptBlocks();
+        scheduleSave();
+        focusBlockTextarea(targetBlock.id, targetBlock.text.length);
+      }
+
+      function handleTextareaKeydown(e, block, textarea) {
+        // 日本語IME変換中は干渉しない
+        if (e.isComposing || e.keyCode === 229) return;
+
+        // 0) Esc キー：文字入力状態を解除して「段落選択状態」へ移行
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          textarea.blur();
+          const card = dom.scriptContainer.querySelector(`[data-block-id="${block.id}"]`);
+          if (card) card.focus({ preventScroll: true });
+          return;
+        }
+
+        // 1) 左右キーによる話者切替
+        //    - 段落が空のとき：単体の ← / → または Shift + ← / → で話者切替
+        //    - 文字入力中のとき：Shift + ← / →（または Alt/Ctrl + ← / →）で話者切替
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          const isEmpty = textarea.value.length === 0;
+          const hasModifier = e.shiftKey || e.altKey || e.ctrlKey || e.metaKey;
+
+          if (isEmpty || hasModifier) {
+            e.preventDefault();
+            const dir = e.key === 'ArrowRight' ? 1 : -1;
+            cycleBlockSpeaker(block.id, dir);
+            return;
+          }
+        }
+
+        // 2) Shift + Enter キー：すぐ下に新しい段落を作成して自動フォーカス
+        //    （※通常の Enter キーはそのままテキストエリア内の段落内改行として動作）
+        if (e.key === 'Enter' && e.shiftKey) {
+          e.preventDefault();
+          const cursorPos = textarea.selectionStart;
+          const currentText = textarea.value;
+          const beforeText = currentText.slice(0, cursorPos);
+          const afterText = currentText.slice(cursorPos);
+
+          block.text = beforeText;
+          textarea.value = beforeText;
+          autoResizeTextarea(textarea);
+
+          insertBlockAfter(block.id, afterText);
+          return;
+        }
+
+        // 3) 空の段落で Backspace：その段落を削除して前の段落の末尾へ移動
+        if (e.key === 'Backspace' && textarea.value.length === 0) {
+          const idx = state.blocks.findIndex(b => b.id === block.id);
+          if (idx > 0) {
+            e.preventDefault();
+            deleteBlock(block.id);
+            return;
+          }
+        }
+
+        // 4) 上下矢印キーでの段落間移動（1行目で ↑ / 最終行で ↓ のとき）
+        if (!e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+          if (e.key === 'ArrowUp') {
+            const firstNewlineIdx = textarea.value.indexOf('\n');
+            const isOnFirstLine = firstNewlineIdx === -1 || textarea.selectionStart <= firstNewlineIdx;
+            if (isOnFirstLine) {
+              const idx = state.blocks.findIndex(b => b.id === block.id);
+              if (idx > 0) {
+                e.preventDefault();
+                const prev = state.blocks[idx - 1];
+                focusBlockTextarea(prev.id, prev.text.length);
+              }
+            }
+          } else if (e.key === 'ArrowDown') {
+            const lastNewlineIdx = textarea.value.lastIndexOf('\n');
+            const isOnLastLine = lastNewlineIdx === -1 || textarea.selectionStart > lastNewlineIdx;
+            if (isOnLastLine) {
+              const idx = state.blocks.findIndex(b => b.id === block.id);
+              if (idx < state.blocks.length - 1) {
+                e.preventDefault();
+                const next = state.blocks[idx + 1];
+                focusBlockTextarea(next.id, 0);
+              }
+            }
+          }
+        }
+      }
+
+      // --------------------------------------------------
+      // 10. 統計情報の更新（文字数・セリフ数・目安尺）
+      // --------------------------------------------------
+      function updateStats() {
+        let totalChars = 0;
+        let dialogueCount = 0;
+
+        state.blocks.forEach((b) => {
+          const cleanLen = b.text.replace(/\s+/g, '').length;
+          totalChars += cleanLen;
+          const spk = getSpeakerById(b.speakerId);
+          if (spk && spk.type === 'dialogue' && cleanLen > 0) {
+            dialogueCount++;
+          }
+        });
+
+        // 日本語台本の一般的な読み上げ速度（約300文字/分 = 5文字/秒）で目安尺を算出
+        const totalSeconds = Math.round(totalChars / 5);
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+
+        dom.statTotalChars.textContent = totalChars.toLocaleString();
+        dom.statDialogueCount.textContent = dialogueCount.toLocaleString();
+        dom.statDuration.textContent = `${mins}分${String(secs).padStart(2, '0')}秒`;
+      }
+
+      // --------------------------------------------------
+      // 11. 構造・一括編集モード（選択・一括変更・一括複製・並び替え）
+      // --------------------------------------------------
+      function switchMode(newMode) {
+        state.mode = newMode;
+        const isBulk = newMode === 'bulk';
+
+        if (isBulk) {
+          dom.tabBulkMode.className = 'px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm flex items-center gap-1.5';
+          dom.tabWriteMode.className = 'px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5';
+          dom.bulkToolbar.classList.remove('hidden');
+          dom.hintBar.innerHTML = '<span>☑️ チェックボックスで複数選択し、話者の一括変更・複製・並び替え・テキスト一括編集ができます</span>';
+        } else {
+          dom.tabWriteMode.className = 'px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm flex items-center gap-1.5';
+          dom.tabBulkMode.className = 'px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5';
+          dom.bulkToolbar.classList.add('hidden');
+          dom.hintBar.innerHTML = `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">📱 左右スワイプ</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">⌨️ 空行で ←/→（入力中は Shift+←/→）で話者切替</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">Shift+Enter で段落追加</span>
+          `;
+        }
+
+        renderScriptBlocks();
+      }
+
+      function updateBulkSelectionUI() {
+        dom.selectedCountBadge.textContent = `${state.selectedIds.size}件選択中`;
+      }
+
+      function moveSelectedBlocks(offset) {
+        if (state.selectedIds.size === 0) {
+          showToast('移動する段落を選択してください');
+          return;
+        }
+
+        if (offset < 0) {
+          for (let i = 1; i < state.blocks.length; i++) {
+            if (state.selectedIds.has(state.blocks[i].id) && !state.selectedIds.has(state.blocks[i - 1].id)) {
+              const temp = state.blocks[i - 1];
+              state.blocks[i - 1] = state.blocks[i];
+              state.blocks[i] = temp;
+            }
+          }
+        } else {
+          for (let i = state.blocks.length - 2; i >= 0; i--) {
+            if (state.selectedIds.has(state.blocks[i].id) && !state.selectedIds.has(state.blocks[i + 1].id)) {
+              const temp = state.blocks[i + 1];
+              state.blocks[i + 1] = state.blocks[i];
+              state.blocks[i] = temp;
+            }
+          }
+        }
+
+        renderScriptBlocks();
+        scheduleSave();
+      }
+
+      function duplicateSelectedBlocks() {
+        if (state.selectedIds.size === 0) {
+          showToast('複製する段落を選択してください');
+          return;
+        }
+
+        const updatedBlocks = [];
+        let duplicatedCount = 0;
+
+        state.blocks.forEach((block) => {
+          updatedBlocks.push(block);
+          if (state.selectedIds.has(block.id)) {
+            updatedBlocks.push({
+              id: generateId('blk'),
+              speakerId: block.speakerId,
+              text: block.text
+            });
+            duplicatedCount++;
+          }
+        });
+
+        state.blocks = updatedBlocks;
+        renderScriptBlocks();
+        updateStats();
+        scheduleSave();
+        showToast(`${duplicatedCount}件の段落を複製しました`);
+      }
+
+      // --------------------------------------------------
+      // 12. 話者登録・編集モーダルロジック
+      // --------------------------------------------------
+      function renderSpeakerManagerList() {
+        dom.speakerManagerList.innerHTML = '';
+
+        state.speakers.forEach((spk, idx) => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700';
+
+          const colorInput = document.createElement('input');
+          colorInput.type = 'color';
+          colorInput.value = spk.color;
+          colorInput.className = 'w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent p-0 shrink-0';
+          colorInput.addEventListener('change', (e) => {
+            spk.color = e.target.value;
+            renderScriptBlocks();
+            scheduleSave();
+          });
+
+          const nameInput = document.createElement('input');
+          nameInput.type = 'text';
+          nameInput.value = spk.name;
+          nameInput.disabled = Boolean(spk.locked);
+          nameInput.className = `flex-1 bg-transparent text-sm font-semibold px-2 py-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            spk.locked ? 'text-slate-500 dark:text-slate-400 cursor-not-allowed' : 'text-slate-800 dark:text-slate-100'
+          }`;
+          nameInput.addEventListener('change', (e) => {
+            const trimmed = e.target.value.trim();
+            if (trimmed) {
+              spk.name = trimmed;
+              renderScriptBlocks();
+              scheduleSave();
+            } else {
+              e.target.value = spk.name;
+            }
+          });
+
+          // 順序変更ボタン（上へ・下へ）
+          const moveUpBtn = document.createElement('button');
+          moveUpBtn.type = 'button';
+          moveUpBtn.disabled = idx === 0;
+          moveUpBtn.title = '順序を上へ';
+          moveUpBtn.className = 'p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30';
+          moveUpBtn.textContent = '↑';
+          moveUpBtn.addEventListener('click', () => {
+            if (idx > 0) {
+              const tmp = state.speakers[idx - 1];
+              state.speakers[idx - 1] = state.speakers[idx];
+              state.speakers[idx] = tmp;
+              renderSpeakerManagerList();
+              renderScriptBlocks();
+              scheduleSave();
+            }
+          });
+
+          const moveDownBtn = document.createElement('button');
+          moveDownBtn.type = 'button';
+          moveDownBtn.disabled = idx === state.speakers.length - 1;
+          moveDownBtn.title = '順序を下へ';
+          moveDownBtn.className = 'p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30';
+          moveDownBtn.textContent = '↓';
+          moveDownBtn.addEventListener('click', () => {
+            if (idx < state.speakers.length - 1) {
+              const tmp = state.speakers[idx + 1];
+              state.speakers[idx + 1] = state.speakers[idx];
+              state.speakers[idx] = tmp;
+              renderSpeakerManagerList();
+              renderScriptBlocks();
+              scheduleSave();
+            }
+          });
+
+          row.appendChild(colorInput);
+          row.appendChild(nameInput);
+          row.appendChild(moveUpBtn);
+          row.appendChild(moveDownBtn);
+
+          if (!spk.locked) {
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.title = 'この話者を削除';
+            delBtn.className = 'p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition';
+            delBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>';
+            delBtn.addEventListener('click', () => {
+              const fallbackId = state.speakers.find(s => s.id !== spk.id)?.id || 'spk_dir';
+              state.blocks.forEach((b) => {
+                if (b.speakerId === spk.id) {
+                  b.speakerId = fallbackId;
+                }
+              });
+              state.speakers = state.speakers.filter(s => s.id !== spk.id);
+              renderSpeakerManagerList();
+              renderScriptBlocks();
+              scheduleSave();
+              showToast(`「${spk.name}」を削除しました`);
+            });
+            row.appendChild(delBtn);
+          } else {
+            const badge = document.createElement('span');
+            badge.className = 'text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 shrink-0';
+            badge.textContent = '固定';
+            row.appendChild(badge);
+          }
+
+          dom.speakerManagerList.appendChild(row);
+        });
+      }
+
+      // --------------------------------------------------
+      // 13. 汎用テキスト形式 (.txt) の書き出し＆解析（他メモ帳互換）
+      // --------------------------------------------------
+      function serializeScriptToPlainText(includeHeader = true) {
+        const blocksText = [];
+
+        state.blocks.forEach((block) => {
+          const spk = getSpeakerById(block.speakerId);
+          const text = block.text.trim();
+          if (!text) return;
+
+          if (spk.type === 'scene') {
+            blocksText.push(`■ ${text}`);
+          } else if (spk.type === 'direction') {
+            blocksText.push(`（${text}）`);
+          } else {
+            blocksText.push(`${spk.name}「${text}」`);
+          }
+        });
+
+        const body = blocksText.join('\n\n');
+
+        if (!includeHeader) {
+          return body;
+        }
+
+        const headerLines = [`【タイトル】${state.title}`];
+        const charNames = state.speakers
+          .filter(s => s.type === 'dialogue')
+          .map(s => s.name);
+        if (charNames.length > 0) {
+          headerLines.push(`【登場人物】${charNames.join('、')}`);
+        }
+        headerLines.push('----------------------------------------');
+
+        return body ? `${headerLines.join('\n')}\n\n${body}` : headerLines.join('\n');
+      }
+
+      /**
+       * 外部メモ帳や一括編集テキストを解析して台本ブロックに復元する
+       * 対応フォーマット：
+       *  - 太郎「セリフ」 / 太郎: セリフ / 太郎：セリフ
+       *  - （ト書き） / (ト書き)
+       *  - ■ シーン / # シーン
+       */
+      function parsePlainTextToScript(rawText) {
+        const normalized = rawText.replace(/\r\n/g, '\n');
+        const rawLines = normalized.split('\n');
+
+        let parsedTitle = state.title;
+        const newBlocks = [];
+
+        const findOrCreateDialogueSpeaker = (name) => {
+          const cleanName = name.trim();
+          let existing = state.speakers.find(s => s.name === cleanName);
+          if (!existing) {
+            const color = SPEAKER_PALETTE[state.speakers.length % SPEAKER_PALETTE.length];
+            existing = {
+              id: generateId('spk'),
+              name: cleanName,
+              color,
+              type: 'dialogue',
+              locked: false
+            };
+            state.speakers.push(existing);
+          }
+          return existing;
+        };
+
+        // 複数行カギカッコ「...」にも対応するため行を結合しながら解析
+        let bufferLine = '';
+        const mergedEntries = [];
+
+        rawLines.forEach((line) => {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            if (bufferLine) {
+              mergedEntries.push(bufferLine);
+              bufferLine = '';
+            }
+            return;
+          }
+
+          if (bufferLine) {
+            bufferLine += '\n' + trimmed;
+            if (trimmed.endsWith('」') || trimmed.endsWith('）') || trimmed.endsWith(')')) {
+              mergedEntries.push(bufferLine);
+              bufferLine = '';
+            }
+          } else if (/^[^「（(]+「[^」]*$/.test(trimmed)) {
+            bufferLine = trimmed;
+          } else {
+            mergedEntries.push(trimmed);
+          }
+        });
+        if (bufferLine) {
+          mergedEntries.push(bufferLine);
+        }
+
+        mergedEntries.forEach((entry) => {
+          // 区切り線は無視
+          if (/^[-=─━]{4,}$/.test(entry)) return;
+
+          // メタ情報ヘッダー
+          if (entry.startsWith('【タイトル】')) {
+            const t = entry.replace('【タイトル】', '').trim();
+            if (t) parsedTitle = t;
+            return;
+          }
+          if (entry.startsWith('【登場人物】')) {
+            const namesStr = entry.replace('【登場人物】', '').trim();
+            namesStr.split(/[、,・\/／\s]+/).forEach((n) => {
+              if (n.trim()) findOrCreateDialogueSpeaker(n.trim());
+            });
+            return;
+          }
+
+          // シーン見出し: ■ ... または # ...
+          if (/^[■□#＃]\s*(.+)$/.test(entry)) {
+            const match = entry.match(/^[■□#＃]\s*(.+)$/);
+            newBlocks.push({
+              id: generateId('blk'),
+              speakerId: 'spk_scene',
+              text: match[1].trim()
+            });
+            return;
+          }
+
+          // ト書き: （...） または (...)
+          if (/^[（(]([\s\S]+)[）)]$/.test(entry)) {
+            const match = entry.match(/^[（(]([\s\S]+)[）)]$/);
+            newBlocks.push({
+              id: generateId('blk'),
+              speakerId: 'spk_dir',
+              text: match[1].trim()
+            });
+            return;
+          }
+
+          // セリフ形式1: 話者名「セリフ」
+          const bracketMatch = entry.match(/^([^\s「:：]{1,20})「([\s\S]*)」$/);
+          if (bracketMatch) {
+            const spk = findOrCreateDialogueSpeaker(bracketMatch[1]);
+            newBlocks.push({
+              id: generateId('blk'),
+              speakerId: spk.id,
+              text: bracketMatch[2]
+            });
+            return;
+          }
+
+          // セリフ形式2: 話者名: セリフ / 話者名：セリフ
+          const colonMatch = entry.match(/^([^\s「:：]{1,20})\s*[:：]\s*([\s\S]+)$/);
+          if (colonMatch) {
+            const spk = findOrCreateDialogueSpeaker(colonMatch[1]);
+            newBlocks.push({
+              id: generateId('blk'),
+              speakerId: spk.id,
+              text: colonMatch[2]
+            });
+            return;
+          }
+
+          // それ以外はト書きとして取り込む
+          newBlocks.push({
+            id: generateId('blk'),
+            speakerId: 'spk_dir',
+            text: entry
+          });
+        });
+
+        state.title = parsedTitle;
+        dom.scriptTitleInput.value = parsedTitle;
+
+        if (newBlocks.length > 0) {
+          state.blocks = newBlocks;
+        } else {
+          state.blocks = [{ id: generateId('blk'), speakerId: state.speakers[2]?.id || 'spk_dir', text: '' }];
+        }
+
+        state.activeBlockId = state.blocks[0].id;
+        state.selectedIds.clear();
+        renderScriptBlocks();
+        scheduleSave();
+      }
+
+      // --------------------------------------------------
+      // 14. イベントリスナーの登録と初期化
+      // --------------------------------------------------
+      function bindEvents() {
+        // タイトル編集
+        dom.scriptTitleInput.addEventListener('input', (e) => {
+          state.title = e.target.value || '無題の台本';
+          scheduleSave();
+        });
+
+        // モード切替タブ
+        dom.tabWriteMode.addEventListener('click', () => switchMode('write'));
+        dom.tabBulkMode.addEventListener('click', () => switchMode('bulk'));
+
+        // 末尾に段落を追加ボタン
+        dom.btnAppendBlock.addEventListener('click', () => {
+          const lastBlock = state.blocks[state.blocks.length - 1];
+          insertBlockAfter(lastBlock ? lastBlock.id : null, '');
+        });
+
+        // 汎用テキスト(.txt)ダウンロード保存（フォールバック用）
+        const downloadTxtFallback = (content, filename) => {
+          const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          showToast(`「${filename}」を保存しました`);
+        };
+
+        // ローカルファイル連携表示の更新
+        const updateLinkedFileUI = () => {
+          if (state.fileHandle && state.linkedFileName) {
+            dom.linkedFileBadge.textContent = `📄 ${state.linkedFileName}`;
+            dom.linkedFileBadge.classList.remove('hidden');
+            dom.btnExportTxtLabel.textContent = '上書き保存';
+          } else {
+            dom.linkedFileBadge.textContent = '';
+            dom.linkedFileBadge.classList.add('hidden');
+            dom.btnExportTxtLabel.textContent = '保存(.txt)';
+          }
+        };
+
+        // PCローカルファイルへの直接保存・上書き保存（Ctrl + S 対応）
+        const saveScriptToLocalFile = async (forceSaveAs = false) => {
+          const content = serializeScriptToPlainText(true);
+          const safeFilename = `${(state.title || '無題の台本').replace(/[\\/:*?"<>|]/g, '_')}.txt`;
+
+          try {
+            // すでにローカルファイルを開いている場合は直接上書き保存
+            if (!forceSaveAs && state.fileHandle) {
+              const writable = await state.fileHandle.createWritable();
+              await writable.write(content);
+              await writable.close();
+              showToast(`「${state.linkedFileName}」に上書き保存しました`);
+              return;
+            }
+
+            // PCローカルブラウザの File System Access API が使える場合は保存ダイアログを表示
+            if (typeof window.showSaveFilePicker === 'function') {
+              const handle = await window.showSaveFilePicker({
+                suggestedName: safeFilename,
+                types: [{
+                  description: 'テキストファイル (.txt)',
+                  accept: { 'text/plain': ['.txt'] }
+                }]
+              });
+              const writable = await handle.createWritable();
+              await writable.write(content);
+              await writable.close();
+              state.fileHandle = handle;
+              state.linkedFileName = handle.name;
+              updateLinkedFileUI();
+              showToast(`「${handle.name}」に保存しました（以降 Ctrl+S で上書き可能）`);
+              return;
+            }
+          } catch (err) {
+            if (err && err.name === 'AbortError') return; // ユーザーによるキャンセル
+            // プレビュー環境などの制限時は標準ダウンロード保存にフォールバック
+          }
+
+          downloadTxtFallback(content, safeFilename);
+        };
+
+        dom.btnExportTxt.addEventListener('click', () => saveScriptToLocalFile(false));
+        dom.btnSaveAsTxt.addEventListener('click', () => saveScriptToLocalFile(true));
+
+        // PCショートカット Ctrl+S / Cmd+S で台本を直接保存
+        window.addEventListener('keydown', (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            saveScriptToLocalFile(e.shiftKey);
+          }
+        });
+
+        // 段落を選択し、かつ文字入力状態でない時のキーボード操作（矢印キーでの話者切替・段落移動）
+        window.addEventListener('keydown', (e) => {
+          if (e.isComposing || e.keyCode === 229) return;
+
+          // モーダルが開いている時は無効
+          const isAnyModalOpen =
+            !dom.speakerModal.classList.contains('hidden') ||
+            !dom.plainTextModal.classList.contains('hidden') ||
+            !dom.confirmModal.classList.contains('hidden');
+          if (isAnyModalOpen) return;
+
+          // テキスト入力要素（textarea / input / select）にフォーカスがある時は対象外
+          const activeEl = document.activeElement;
+          const isTyping =
+            activeEl &&
+            (activeEl.tagName === 'TEXTAREA' ||
+              activeEl.tagName === 'INPUT' ||
+              activeEl.tagName === 'SELECT' ||
+              activeEl.isContentEditable);
+          if (isTyping) return;
+
+          if (!state.blocks || state.blocks.length === 0) return;
+
+          // 対象となる選択中段落を特定（未選択なら先頭を選択）
+          let targetId = state.activeBlockId;
+          if (!targetId || !state.blocks.some(b => b.id === targetId)) {
+            targetId = state.blocks[0].id;
+            state.activeBlockId = targetId;
+            updateSingleBlockAppearance(targetId);
+            renderSpeakerQuickBar();
+          }
+
+          // 左右矢印キー：選択中段落の話者を切り替え
+          if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const dir = e.key === 'ArrowRight' ? 1 : -1;
+            cycleBlockSpeaker(targetId, dir);
+            return;
+          }
+
+          // 上下矢印キー：選択する段落を前後に移動
+          if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            const currentIdx = state.blocks.findIndex(b => b.id === targetId);
+            if (currentIdx === -1) return;
+            const nextIdx = e.key === 'ArrowDown'
+              ? Math.min(state.blocks.length - 1, currentIdx + 1)
+              : Math.max(0, currentIdx - 1);
+            if (nextIdx !== currentIdx) {
+              const prevId = state.activeBlockId;
+              const nextBlock = state.blocks[nextIdx];
+              state.activeBlockId = nextBlock.id;
+              updateSingleBlockAppearance(prevId);
+              updateSingleBlockAppearance(nextBlock.id);
+              renderSpeakerQuickBar();
+              const nextCard = dom.scriptContainer.querySelector(`[data-block-id="${nextBlock.id}"]`);
+              if (nextCard) {
+                nextCard.focus({ preventScroll: true });
+                nextCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+              }
+            }
+            return;
+          }
+
+          // Enterキー：選択中の段落の文字入力状態に入る
+          if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            const targetBlock = state.blocks.find(b => b.id === targetId);
+            if (targetBlock) {
+              focusBlockTextarea(targetBlock.id, targetBlock.text.length);
+            }
+          }
+        });
+
+        // 汎用テキスト(.txt)インポート処理（PCローカルファイル連携にも対応）
+        const importTextFile = async (file, handle = null) => {
+          if (!file) return;
+          try {
+            const text = await file.text();
+            parsePlainTextToScript(text);
+            state.fileHandle = handle;
+            state.linkedFileName = file.name;
+            updateLinkedFileUI();
+            if (!text.includes('【タイトル】')) {
+              const nameWithoutExt = file.name.replace(/\.txt$/i, '');
+              state.title = nameWithoutExt;
+              dom.scriptTitleInput.value = nameWithoutExt;
+              scheduleSave();
+            }
+            showToast(`「${file.name}」を読み込みました`);
+          } catch (err) {
+            console.error('ファイル読込エラー:', err);
+            showToast('ファイルの読み込みに失敗しました', 'error');
+          }
+        };
+
+        // PCローカルの.txtファイルを開く
+        dom.btnOpenLocalFile.addEventListener('click', async () => {
+          try {
+            if (typeof window.showOpenFilePicker === 'function') {
+              const [handle] = await window.showOpenFilePicker({
+                types: [{
+                  description: 'テキストファイル (.txt)',
+                  accept: { 'text/plain': ['.txt'] }
+                }],
+                multiple: false
+              });
+              const file = await handle.getFile();
+              await importTextFile(file, handle);
+              return;
+            }
+          } catch (err) {
+            if (err && err.name === 'AbortError') return;
+          }
+          dom.fileImportInput.click();
+        });
+
+        dom.fileImportInput.addEventListener('change', async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) {
+            await importTextFile(file, null);
+          }
+          e.target.value = '';
+        });
+
+        // 外部.txtファイルのドラッグ＆ドロップ読み込み
+        let fileDragDepth = 0;
+        window.addEventListener('dragenter', (e) => {
+          if (draggedBlockId) return;
+          if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+            e.preventDefault();
+            fileDragDepth++;
+            dom.fileDropOverlay.classList.remove('hidden');
+          }
+        });
+        window.addEventListener('dragover', (e) => {
+          if (draggedBlockId) return;
+          if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+            e.preventDefault();
+          }
+        });
+        window.addEventListener('dragleave', () => {
+          if (draggedBlockId) return;
+          fileDragDepth = Math.max(0, fileDragDepth - 1);
+          if (fileDragDepth === 0) {
+            dom.fileDropOverlay.classList.add('hidden');
+          }
+        });
+        window.addEventListener('drop', (e) => {
+          if (draggedBlockId) return;
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            e.preventDefault();
+            fileDragDepth = 0;
+            dom.fileDropOverlay.classList.add('hidden');
+            importTextFile(e.dataTransfer.files[0], null);
+          }
+        });
+
+        // その他ドロップダウン開閉
+        dom.btnMoreMenu.addEventListener('click', (e) => {
+          e.stopPropagation();
+          dom.moreDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', () => {
+          dom.moreDropdown.classList.add('hidden');
+        });
+
+        // ダークモード切替
+        dom.btnToggleDark.addEventListener('click', () => {
+          state.darkMode = !state.darkMode;
+          applyDarkMode();
+          scheduleSave();
+        });
+
+        // サンプル台本読込
+        dom.btnLoadSample.addEventListener('click', async () => {
+          const ok = await showConfirmDialog('サンプル台本の読み込み', '現在の編集内容をサンプル台本に置き換えますか？');
+          if (!ok) return;
+          state.title = 'サンプル台本（操作ガイド）';
+          state.fileHandle = null;
+          state.linkedFileName = '';
+          updateLinkedFileUI();
+          dom.scriptTitleInput.value = state.title;
+          state.speakers = getDefaultSpeakers();
+          state.blocks = getSampleBlocks();
+          state.activeBlockId = state.blocks[0].id;
+          state.selectedIds.clear();
+          renderScriptBlocks();
+          scheduleSave();
+          showToast('サンプル台本を読み込みました');
+        });
+
+        // 新規作成時はファイルハンドル連携を解除
+        dom.btnClearAll.addEventListener('click', async () => {
+          const ok = await showConfirmDialog('新規台本の作成', '現在の台本内容をすべて消去して新しく始めますか？');
+          if (!ok) return;
+          state.title = '無題の台本';
+          state.fileHandle = null;
+          state.linkedFileName = '';
+          updateLinkedFileUI();
+          dom.scriptTitleInput.value = state.title;
+          state.blocks = [{ id: generateId('blk'), speakerId: state.speakers[2]?.id || 'spk_dir', text: '' }];
+          state.activeBlockId = state.blocks[0].id;
+          state.selectedIds.clear();
+          renderScriptBlocks();
+          scheduleSave();
+          focusBlockTextarea(state.blocks[0].id, 0);
+          showToast('新しい台本を作成しました');
+        });
+
+        // 話者登録・編集モーダル
+        const openSpeakerModal = () => {
+          const nextColor = SPEAKER_PALETTE[state.speakers.length % SPEAKER_PALETTE.length];
+          dom.newSpeakerColorInput.value = nextColor;
+          renderSpeakerManagerList();
+          dom.speakerModal.classList.remove('hidden');
+          dom.newSpeakerNameInput.focus();
+        };
+        const closeSpeakerModal = () => {
+          dom.speakerModal.classList.add('hidden');
+        };
+
+        dom.btnOpenSpeakerModal.addEventListener('click', openSpeakerModal);
+        dom.btnCloseSpeakerModal.addEventListener('click', closeSpeakerModal);
+        dom.btnDoneSpeakerModal.addEventListener('click', closeSpeakerModal);
+
+        dom.addSpeakerForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const name = dom.newSpeakerNameInput.value.trim();
+          if (!name) return;
+
+          const newSpeaker = {
+            id: generateId('spk'),
+            name,
+            color: dom.newSpeakerColorInput.value,
+            type: 'dialogue',
+            locked: false
+          };
+          state.speakers.push(newSpeaker);
+          dom.newSpeakerNameInput.value = '';
+          dom.newSpeakerColorInput.value = SPEAKER_PALETTE[state.speakers.length % SPEAKER_PALETTE.length];
+
+          renderSpeakerManagerList();
+          renderSpeakerQuickBar();
+          scheduleSave();
+          showToast(`話者「${name}」を追加しました`);
+        });
+
+        // 一括編集アクション
+        dom.btnSelectAll.addEventListener('click', () => {
+          state.blocks.forEach(b => state.selectedIds.add(b.id));
+          renderScriptBlocks();
+        });
+
+        dom.btnDeselectAll.addEventListener('click', () => {
+          state.selectedIds.clear();
+          renderScriptBlocks();
+        });
+
+        dom.selectBySpeakerDropdown.addEventListener('change', (e) => {
+          const targetSpkId = e.target.value;
+          if (!targetSpkId) return;
+          state.selectedIds.clear();
+          state.blocks.forEach((b) => {
+            if (b.speakerId === targetSpkId) {
+              state.selectedIds.add(b.id);
+            }
+          });
+          e.target.value = '';
+          renderScriptBlocks();
+        });
+
+        dom.btnBulkAssign.addEventListener('click', () => {
+          if (state.selectedIds.size === 0) {
+            showToast('変更する段落を選択してください');
+            return;
+          }
+          const targetSpkId = dom.bulkAssignSpeakerSelect.value;
+          const spk = getSpeakerById(targetSpkId);
+          state.blocks.forEach((b) => {
+            if (state.selectedIds.has(b.id)) {
+              b.speakerId = targetSpkId;
+            }
+          });
+          renderScriptBlocks();
+          scheduleSave();
+          showToast(`${state.selectedIds.size}件の段落を「${spk.name}」に変更しました`);
+        });
+
+        dom.btnBulkMoveUp.addEventListener('click', () => moveSelectedBlocks(-1));
+        dom.btnBulkMoveDown.addEventListener('click', () => moveSelectedBlocks(1));
+        dom.btnBulkDuplicate.addEventListener('click', duplicateSelectedBlocks);
+
+        dom.btnBulkDelete.addEventListener('click', async () => {
+          if (state.selectedIds.size === 0) {
+            showToast('削除する段落を選択してください');
+            return;
+          }
+          const ok = await showConfirmDialog('選択段落の一括削除', `選択中の ${state.selectedIds.size} 件の段落を削除しますか？`);
+          if (!ok) return;
+
+          state.blocks = state.blocks.filter(b => !state.selectedIds.has(b.id));
+          if (state.blocks.length === 0) {
+            state.blocks.push({ id: generateId('blk'), speakerId: state.speakers[2]?.id || 'spk_dir', text: '' });
+          }
+          state.selectedIds.clear();
+          state.activeBlockId = state.blocks[0].id;
+          renderScriptBlocks();
+          scheduleSave();
+          showToast('選択した段落を削除しました');
+        });
+
+        // テキスト一括編集モーダル
+        const closePlainTextModal = () => dom.plainTextModal.classList.add('hidden');
+        dom.btnOpenPlainTextModal.addEventListener('click', () => {
+          dom.plainTextEditorArea.value = serializeScriptToPlainText(false);
+          dom.plainTextModal.classList.remove('hidden');
+        });
+        dom.btnClosePlainTextModal.addEventListener('click', closePlainTextModal);
+        dom.btnCancelPlainTextModal.addEventListener('click', closePlainTextModal);
+
+        dom.btnCopyPlainText.addEventListener('click', () => {
+          dom.plainTextEditorArea.select();
+          try {
+            document.execCommand('copy');
+            showToast('台本テキストをコピーしました');
+          } catch (err) {
+            showToast('コピーに失敗しました', 'error');
+          }
+        });
+
+        dom.btnApplyPlainText.addEventListener('click', () => {
+          parsePlainTextToScript(dom.plainTextEditorArea.value);
+          closePlainTextModal();
+          showToast('一括編集の内容を反映しました');
+        });
+
+        // ウィンドウリサイズ時に全テキストエリアの高さを再計算
+        window.addEventListener('resize', () => {
+          dom.scriptContainer.querySelectorAll('textarea').forEach(autoResizeTextarea);
+        });
+      }
+
+      // 起動処理
+      function init() {
+        try {
+          loadFromStorage();
+          applyDarkMode();
+          dom.scriptTitleInput.value = state.title;
+          bindEvents();
+          renderScriptBlocks();
+        } catch (err) {
+          console.error('初期化エラー:', err);
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
